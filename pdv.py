@@ -18,7 +18,7 @@ print("\n--- PRODUTOS ---")
 
 for produto in produtos:
     id_, nome, categoria_id, preco, estoque = produto
-    print(f"{id_} - {nome} |  Preço: R$ {preco:.2f} - Estoque: {estoque}")
+    print(f"{id_} - {nome} |  Preço: R$ {preco:.2f} | Estoque: {estoque}")
 
 # entrada = input("\nDigite o ID do produto: ")
 
@@ -104,7 +104,7 @@ def alterar_produto(conn):
         id_produto, nome, categoria_id, preco_atual, estoque_atual = produto
         print(
             f"Produto selecionado: {nome} | Preço: R$ {preco_atual:.2f} "
-            f"\n- Estoque: {estoque_atual}"
+            f"| Estoque: {estoque_atual}"
         )
         try:
             preco = float(input("Novo preço (ex: 5.60): ").replace(",", "."))
@@ -221,12 +221,12 @@ def nova_venda(conn):
                         "VALUES (%s, %s, %s, %s)",
                     (pedido_id, id_, quantidade, preco)
                 )
-                    #baixando o estoque do produto após a venda
-                    cursor.execute(
-                            "UPDATE produtos SET estoque = estoque - %s WHERE id = %s",
-                            (quantidade, id_)
-                    )
-                    print(f"Baixou {quantidade} itens do produto {id_}")
+                    #teste - baixando o estoque do produto após a venda
+                    #cursor.execute(
+                            #"UPDATE produtos SET estoque = estoque - %s WHERE id = %s",
+                            #(quantidade, id_)
+                    #)
+                    #print(f"Baixou {quantidade} itens do produto {id_}")
 
                 conn.commit() #confirmando/salvando a transação no banco
                 print(f"Venda registrada com sucesso! Total: R$ {total:.2f}")
@@ -251,7 +251,40 @@ def listar_produtos(conn):
     print("\n--- PRODUTOS ---")
     for produto in produtos:
         id_, nome, categoria_id, preco, estoque = produto
-        print(f"{id_} - {nome} |  Preço: R$ {preco:.2f} - Estoque: {estoque}")
+        print(f"{id_} - {nome} |  Preço: R$ {preco:.2f} | Estoque: {estoque}")
+
+def relatorio_vendas(conn):
+    cursor = conn.cursor()
+    cursor.execute("""select pr.nome, sum(ip.quantidade) as total_vendido from itens_pedido ip
+join pedidos p on ip.pedido_id = p.id
+join produtos pr on ip.produto_id = pr.id
+WHERE date(p.data_pedido) = curdate()
+group by pr.id 
+order by total_vendido desc
+limit 3""")
+    ranking = cursor.fetchall()
+    cursor.execute("""SELECT coalesce(sum(p.valor_total), 0), count(p.id), coalesce(avg(valor_total), 0)  from pedidos p
+where date(p.data_pedido) = curdate()
+""")
+    estatisticas = cursor.fetchall()
+    cursor.close()
+
+
+
+    print("\n=== RELATÓRIO DE VENDAS ===")
+    if not ranking:
+        print("Nenhum produto vendido hoje.")
+    else:
+        print("Produtos mais vendidos hoje:")
+        for nome, total_vendido in ranking:
+            print(f"{nome}: {total_vendido} unidades vendidas")
+
+    if estatisticas:
+        total_faturado, quantidade_vendas, media_vendas = estatisticas[0]
+        print(f"\nEstatísticas do dia:")
+        print(f"Total faturado: R$ {total_faturado:.2f}")
+        print(f"Quantidade de vendas: {quantidade_vendas}")
+        print(f"Média por venda: R$ {media_vendas:.2f}")
 
 while True:
     print("\n===== PDV CHEFPAES =====")
@@ -259,6 +292,7 @@ while True:
     print("2 - Listar produtos")
     print("3 - Cadastrar produto")
     print("4 - Alterar produto")
+    print("5 - Relatório de vendas")
     print("0 - Sair")
     opcao = input("Escolha: ")
 
@@ -270,10 +304,16 @@ while True:
         cadastrar_produto(conn)
     elif opcao == "4":
         alterar_produto(conn)
+    elif opcao == "5":
+        relatorio_vendas(conn)
     elif opcao == "0":
         break
     else:
         print("Opção inválida.")
+
+
+
+
 
 conn.close() 
 print("Finalizado")
